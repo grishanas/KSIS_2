@@ -17,7 +17,9 @@ namespace NETTEST1
             IPAddress ipdest = IPAddress.Parse(Console.ReadLine());
             IPEndPoint endp = new IPEndPoint(ipdest, 1);
             IPEndPoint src = new IPEndPoint(IPAddress.Any, 1);
-     
+            Socket icmp_s = new Socket(AddressFamily.InterNetwork, SocketType.Raw, ProtocolType.Icmp);
+            icmp_s.ReceiveTimeout = 1000;
+            
 
 
 
@@ -28,8 +30,7 @@ namespace NETTEST1
                 try
                 {
                     // создание сокета с icmp протоколом(ip заголовок)
-                    Socket icmp_s = new Socket(AddressFamily.InterNetwork, SocketType.Raw, ProtocolType.Icmp);
-                    icmp_s.ReceiveTimeout = 1000;
+                    
                                  
 
                     //заполнение данных  icmp протокола
@@ -69,7 +70,7 @@ namespace NETTEST1
                         }
 
                     }
-                    icmp_s.Close();
+                    
                     int HeaderLength = (recivebuf[0] & 0xf)*4;
                     
                     Console.Write(recivebuf[12] + "."+ recivebuf[13] + "."+recivebuf[14] + "."+recivebuf[15]+"   ");
