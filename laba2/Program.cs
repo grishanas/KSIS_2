@@ -11,113 +11,73 @@ namespace NETTEST1
         static void Main()
         {
             byte[] recivebuf = new byte[200];
-
+            
             //создание ip адресов выхода и входа
             Stopwatch track = new Stopwatch();
             IPAddress ipdest = IPAddress.Parse(Console.ReadLine());
             IPEndPoint endp = new IPEndPoint(ipdest, 1);
             IPEndPoint src = new IPEndPoint(IPAddress.Any, 1);
-
-            Random rnd = new Random();
-            ushort value = (ushort)rnd.Next();
-            byte[] icmpData = new byte[40];
-            icmpData[0] = (byte)8;
-            icmpData[1] = (byte)0;
-
-
-
-            IPEndPoint pingDestination = new IPEndPoint(ipdest, 0);
+            Socket icmp_s = new Socket(AddressFamily.InterNetwork, SocketType.Raw, ProtocolType.Icmp);
+            icmp_s.ReceiveTimeout = 1000;
+            
 
 
 
             short TTL = 1;
-            ushort checksumValue;
-            IPHostEntry name = new IPHostEntry();
+           
             while (TTL < 127)
             {
-                Console.Write("{0}", TTL);
                 try
                 {
-                    icmpData[2] = 0;
-                    icmpData[3] = 0;
-                    icmpData[6] = (byte)(value);
-                    icmpData[7] = (byte)(value >> 8);
+                    // создание сокета с icmp протоколом(ip заголовок)
+                    
+                                 
+
+                    //заполнение данных  icmp протокола
+                    byte[] icmpData = new byte[40];
+                    int offset = 0;
+                    icmpData[offset++] = (byte)8; 
+                    icmpData[offset++] = (byte)0; 
+                    icmpData[offset++] = 0;       
+                    icmpData[offset++] = 0;
+                    ushort checksumValue;
+
 
                     checksumValue = ComputeChecksum(icmpData);
+                  
 
-                    icmpData[2] = (byte)(checksumValue);
-                    icmpData[3] = (byte)(checksumValue >> 8);
+                    icmpData[2] =(byte) (checksumValue);
+                    icmpData[3] = (byte)(checksumValue>>8);
 
+                    IPEndPoint pingDestination = new IPEndPoint(ipdest, 0);
 
-                    Socket icmp_s = new Socket(AddressFamily.InterNetwork, SocketType.Raw, ProtocolType.Icmp);
-                    icmp_s.ReceiveTimeout = 10000;
                     icmp_s.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.IpTimeToLive, TTL);
                     icmp_s.Bind(src);
                     for (int i = 0; i < 3; i++)
                     {
-
-
-                        try
+                        track.Reset();
+                        track.Start();
+                        icmp_s.SendTo(icmpData, pingDestination);
+                        var tmp = icmp_s.Receive(recivebuf);
+                        track.Stop();
+                        if(track.ElapsedMilliseconds>0)
                         {
-                            track.Reset();
-                            track.Start();
-                            icmp_s.SendTo(icmpData, pingDestination);
-                            var tmp = icmp_s.Receive(recivebuf);
-                            track.Stop();
-                            if (track.ElapsedMilliseconds > 0)
-                            {
-                                Console.Write("  {0,3} ms  ", track.ElapsedMilliseconds);
-                            }
-                            else
-                            {
-                                Console.Write("  <1 ms   ");
-                            }
-                            value = (ushort)((recivebuf[54] << 8) + recivebuf[53] + 1);
-
-                            icmpData[2] = 0;
-                            icmpData[3] = 0;
-                            icmpData[6] = (byte)(value);
-                            icmpData[7] = (byte)(value >> 8);
-
-                            checksumValue = ComputeChecksum(icmpData);
-
-                            icmpData[2] = (byte)(checksumValue);
-                            icmpData[3] = (byte)(checksumValue >> 8);
-
-
-
-
+                            Console.Write("  {0,3} ms  ", track.ElapsedMilliseconds);
                         }
-                        catch (SocketException e)
+                        else
                         {
-                            Console.Write("    *    ");
+                            Console.Write("  <1 ms   ");
                         }
 
-
-
-
-
                     }
+                    
+                    int HeaderLength = (recivebuf[0] & 0xf)*4;
+                    
+                    Console.Write(recivebuf[12] + "."+ recivebuf[13] + "."+recivebuf[14] + "."+recivebuf[15]+"   ");
 
-                    icmp_s.Close();
-                    int HeaderLength = (recivebuf[0] & 0xf) * 4;
+                    IPHostEntry name = Dns.GetHostEntry(recivebuf[12] + "." + recivebuf[13] + "." + recivebuf[14] + "." + recivebuf[15]);
 
-
-
-                    Console.Write(recivebuf[12] + "." + recivebuf[13] + "." + recivebuf[14] + "." + recivebuf[15] + "   ");
-
-
-                    try
-                    {
-                        name = Dns.GetHostEntry(recivebuf[12] + "." + recivebuf[13] + "." + recivebuf[14] + "." + recivebuf[15]);
-                        Console.WriteLine(name.HostName);
-                    }
-                    catch (SocketException e)
-                    {
-                        Console.WriteLine("этот хост неизвестен");
-                    }
-
-
+                    Console.WriteLine(name.HostName);
                     if (recivebuf[HeaderLength] == 0)
                         break;
                 }
@@ -130,7 +90,7 @@ namespace NETTEST1
                     ++TTL;
                 }
             }
-            Console.WriteLine("Трассировка завершена.");
+
             Console.ReadKey();
         }
 
@@ -138,7 +98,7 @@ namespace NETTEST1
         {
 
             UInt32 chcksm = 0;
-
+            
             int index = 0;
 
             while (index < payLoad.Length)
